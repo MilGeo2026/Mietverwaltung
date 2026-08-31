@@ -7,42 +7,213 @@
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
-  <header>
-    <h1>Mietverwaltung</h1>
-    <button id="logout-btn" hidden>Abmelden</button>
-  </header>
 
-  <main>
-    <section id="auth-section">
-      <h2>Anmelden</h2>
-      <form id="auth-form">
-        <label>
-          E-Mail
-          <input type="email" id="email" required autocomplete="email" />
-        </label>
-        <label>
-          Passwort
-          <input type="password" id="password" required autocomplete="current-password" />
-        </label>
-        <div class="auth-actions">
-          <button type="submit" data-action="login">Anmelden</button>
-          <button type="button" data-action="signup">Registrieren</button>
+<!-- ══ AUTH SCREEN ══ -->
+<div id="auth-screen" style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#F0F4F8;padding:20px;">
+  <div class="card" style="width:100%;max-width:380px;padding:32px;">
+    <h1 style="font-size:18px;color:var(--blue-dark);margin-bottom:4px;">🏠 Mietverwaltung</h1>
+    <p style="color:var(--gray);font-size:13px;margin-bottom:20px;">Anmeldung</p>
+    <div class="form-group" style="margin-bottom:12px;">
+      <label>E-Mail</label>
+      <input id="auth-email" type="email" placeholder="name@example.com">
+    </div>
+    <div class="form-group" style="margin-bottom:14px;">
+      <label>Passwort</label>
+      <input id="auth-password" type="password" placeholder="Mindestens 6 Zeichen">
+    </div>
+    <div id="auth-error" style="display:none;color:var(--red);font-size:12px;margin-bottom:10px;"></div>
+    <div id="auth-info" style="display:none;color:var(--green);font-size:12px;margin-bottom:10px;"></div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;margin-bottom:8px;" onclick="handleLogin()">Anmelden</button>
+    <button class="btn btn-secondary" style="width:100%;justify-content:center;" onclick="handleSignUp()">Neu registrieren</button>
+  </div>
+</div>
+
+<div id="app-root" style="display:none">
+<div class="layout">
+
+  <!-- ══ SIDEBAR ══ -->
+  <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <div>
+        <h1>🏠 Mietverwaltung</h1>
+        <span>Immobilien &amp; Wohnungen</span>
+      </div>
+    </div>
+    <nav class="nav">
+      <div class="nav-item active" data-page="dashboard" onclick="showPage('dashboard')" title="Dashboard">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+        <span>Dashboard</span>
+      </div>
+      <div class="nav-item" data-page="immobilien" onclick="showPage('immobilien')" title="Immobilien">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l9-9 9 9M5 10v10a1 1 0 001 1h12a1 1 0 001-1V10M9 21V12h6v9"/></svg>
+        <span>Immobilien</span>
+      </div>
+    </nav>
+    <div class="sidebar-footer">
+      <div id="user-email" style="color:rgba(255,255,255,.6);margin-bottom:8px;word-break:break-all;"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <span>v1.0 · Mietverwaltung</span>
+        <button class="btn btn-secondary btn-sm" onclick="handleLogout()" style="padding:3px 8px;" title="Logout">Logout</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ══ MAIN ══ -->
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:10px;min-width:0;">
+        <button class="hamburger-btn" onclick="toggleSidebar()" aria-label="Menü öffnen">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+        <span class="topbar-title" id="topbarTitle">Dashboard</span>
+      </div>
+      <div class="topbar-right">
+        <span class="badge" id="topbarBadge">Übersicht</span>
+        <button class="btn btn-primary" id="topbarBtn" onclick="openTopbarAction()">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+          <span id="topbarBtnLabel">Neue Immobilie</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- ══ DASHBOARD ══ -->
+      <div class="page active" id="page-dashboard">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon" style="background:#FCE6F2">
+              <svg fill="none" stroke="#E3007E" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l9-9 9 9M5 10v10a1 1 0 001 1h12a1 1 0 001-1V10M9 21V12h6v9"/></svg>
+            </div>
+            <div>
+              <div class="stat-label">Immobilien gesamt</div>
+              <div class="stat-value" id="stat-immobilien">0</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon" style="background:#F0FDF4">
+              <svg fill="none" stroke="#16A34A" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 22V12h6v10M3 9l9-7 9 7v11a1 1 0 01-1 1H4a1 1 0 01-1-1z"/></svg>
+            </div>
+            <div>
+              <div class="stat-label">Wohnungen gesamt</div>
+              <div class="stat-value" id="stat-wohnungen">0</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon" style="background:#FFFBEB">
+              <svg fill="none" stroke="#D97706" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+            <div>
+              <div class="stat-label">Ø Wohnungen / Immobilie</div>
+              <div class="stat-value" id="stat-durchschnitt">0</div>
+            </div>
+          </div>
         </div>
-        <p id="auth-message" class="message"></p>
-      </form>
-    </section>
 
-    <section id="app-section" hidden>
-      <h2>Meine Immobilien</h2>
-      <form id="property-form">
-        <input type="text" id="property-name" placeholder="Name (z.B. Musterstraße 1)" required />
-        <input type="text" id="property-address" placeholder="Adresse" />
-        <button type="submit">Immobilie hinzufügen</button>
-      </form>
-      <p id="app-message" class="message"></p>
-      <ul id="property-list"></ul>
-    </section>
-  </main>
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Meine Immobilien</span>
+            <button class="btn btn-secondary btn-sm" onclick="showPage('immobilien')">Alle anzeigen</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Name</th><th>Adresse</th><th>Wohnungen</th></tr></thead>
+              <tbody id="dashboard-immobilien"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ IMMOBILIEN ══ -->
+      <div class="page" id="page-immobilien">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Immobilienliste</span>
+            <div class="search-wrap">
+              <span class="search-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg></span>
+              <input type="text" placeholder="Suchen …" oninput="renderImmobilien(this.value)" style="width:220px">
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="table-fixed">
+              <thead>
+                <tr>
+                  <th style="width:26%">Name</th>
+                  <th style="width:34%">Adresse</th>
+                  <th style="width:14%">Wohnungen</th>
+                  <th style="width:26%">Aktionen</th>
+                </tr>
+              </thead>
+              <tbody id="immobilien-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ══ MODAL: IMMOBILIE ══ -->
+<div class="overlay" id="modal-immobilie">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-immobilie-title">Neue Immobilie</span>
+      <button class="close-btn" onclick="closeModal('modal-immobilie')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group full"><label>Name *</label><input id="i-name" placeholder="z.B. Musterstraße 1"></div>
+        <div class="form-group full"><label>Adresse</label><input id="i-address" placeholder="Musterstraße 1, 12345 Musterstadt"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-immobilie')">Abbrechen</button>
+      <button class="btn btn-primary" onclick="saveImmobilie()">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL: WOHNUNGEN EINER IMMOBILIE ══ -->
+<div class="overlay" id="modal-wohnungen">
+  <div class="modal" style="max-width:720px">
+    <div class="modal-header">
+      <span class="modal-title">Wohnungen – <span id="modal-wohnungen-immobilie-name"></span></span>
+      <button class="close-btn" onclick="closeModal('modal-wohnungen')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="table-wrap">
+        <table class="table-fixed">
+          <thead>
+            <tr>
+              <th style="width:40%">Name</th>
+              <th style="width:20%">Größe (m²)</th>
+              <th style="width:15%">Zimmer</th>
+              <th style="width:25%">Aktionen</th>
+            </tr>
+          </thead>
+          <tbody id="wohnungen-tbody"></tbody>
+        </table>
+      </div>
+
+      <div class="section-label" id="wohnung-form-label">Wohnung hinzufügen</div>
+      <div class="form-grid">
+        <div class="form-group full"><label>Name *</label><input id="w-name" placeholder="z.B. Wohnung 1. OG links"></div>
+        <div class="form-group"><label>Größe (m²)</label><input id="w-size" type="number" min="0" step="0.1" placeholder="65"></div>
+        <div class="form-group"><label>Zimmer</label><input id="w-rooms" type="number" min="0" step="0.5" placeholder="3"></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px;">
+        <button class="btn btn-primary btn-sm" onclick="saveWohnung()">Speichern</button>
+        <button class="btn btn-secondary btn-sm" id="wohnung-cancel-edit-btn" style="display:none" onclick="resetWohnungForm()">Bearbeiten abbrechen</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-wohnungen')">Schließen</button>
+    </div>
+  </div>
+</div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="js/config.js"></script>
