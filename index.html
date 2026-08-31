@@ -53,6 +53,10 @@
         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
         <span>Mieter</span>
       </div>
+      <div class="nav-item" data-page="nebenkosten" onclick="showPage('nebenkosten')" title="Nebenkostenabrechnung">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        <span>Nebenkostenabrechnung</span>
+      </div>
     </nav>
     <div class="sidebar-footer">
       <div id="user-email" style="color:rgba(255,255,255,.6);margin-bottom:8px;word-break:break-all;"></div>
@@ -187,15 +191,39 @@
             <table class="table-fixed">
               <thead>
                 <tr>
-                  <th style="width:18%">Name</th>
-                  <th style="width:22%">Wohnung</th>
-                  <th style="width:18%">E-Mail</th>
-                  <th style="width:12%">Telefon</th>
-                  <th style="width:10%">Einzug</th>
-                  <th style="width:20%">Aktionen</th>
+                  <th style="width:16%">Name</th>
+                  <th style="width:20%">Wohnung</th>
+                  <th style="width:16%">E-Mail</th>
+                  <th style="width:10%">Telefon</th>
+                  <th style="width:9%">Einzug</th>
+                  <th style="width:11%">NK-Vorauszahlung</th>
+                  <th style="width:18%">Aktionen</th>
                 </tr>
               </thead>
               <tbody id="mieter-page-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ NEBENKOSTENABRECHNUNG ══ -->
+      <div class="page" id="page-nebenkosten">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Abrechnungen</span>
+          </div>
+          <div class="table-wrap">
+            <table class="table-fixed">
+              <thead>
+                <tr>
+                  <th style="width:22%">Titel</th>
+                  <th style="width:20%">Immobilie</th>
+                  <th style="width:18%">Zeitraum</th>
+                  <th style="width:12%">Gesamtkosten</th>
+                  <th style="width:28%">Aktionen</th>
+                </tr>
+              </thead>
+              <tbody id="nebenkosten-tbody"></tbody>
             </table>
           </div>
         </div>
@@ -282,6 +310,7 @@
         <div class="form-group"><label>Telefon</label><input id="m-phone" placeholder="+49 123 456789"></div>
         <div class="form-group"><label>Einzugsdatum</label><input id="m-move-in" type="date"></div>
         <div class="form-group"><label>Auszugsdatum</label><input id="m-move-out" type="date"></div>
+        <div class="form-group full"><label>Nebenkosten-Vorauszahlung (€/Monat)</label><input id="m-advance" type="number" min="0" step="0.01" placeholder="150.00"></div>
       </div>
     </div>
     <div class="modal-footer">
@@ -334,6 +363,105 @@
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-zahlungen')">Schließen</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL: ABRECHNUNG ANLEGEN/BEARBEITEN ══ -->
+<div class="overlay" id="modal-abrechnung">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-abrechnung-title">Neue Abrechnung</span>
+      <button class="close-btn" onclick="closeModal('modal-abrechnung')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group full"><label>Immobilie *</label>
+          <select id="a-property"></select>
+        </div>
+        <div class="form-group full"><label>Titel *</label><input id="a-title" placeholder="z.B. Nebenkostenabrechnung 2025"></div>
+        <div class="form-group"><label>Zeitraum von *</label><input id="a-period-start" type="date"></div>
+        <div class="form-group"><label>Zeitraum bis *</label><input id="a-period-end" type="date"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-abrechnung')">Abbrechen</button>
+      <button class="btn btn-primary" onclick="saveAbrechnung()">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL: KOSTENPOSITIONEN EINER ABRECHNUNG ══ -->
+<div class="overlay" id="modal-kostenpositionen">
+  <div class="modal" style="max-width:720px">
+    <div class="modal-header">
+      <span class="modal-title">Kostenpositionen – <span id="modal-kostenpositionen-titel"></span></span>
+      <button class="close-btn" onclick="closeModal('modal-kostenpositionen')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="table-wrap">
+        <table class="table-fixed">
+          <thead>
+            <tr>
+              <th style="width:32%">Kategorie</th>
+              <th style="width:20%">Betrag</th>
+              <th style="width:23%">Umlageschlüssel</th>
+              <th style="width:25%">Aktionen</th>
+            </tr>
+          </thead>
+          <tbody id="kostenpositionen-tbody"></tbody>
+        </table>
+      </div>
+
+      <div class="section-label" id="kostenposition-form-label">Kostenposition hinzufügen</div>
+      <div class="form-grid">
+        <div class="form-group full"><label>Kategorie *</label><input id="kp-category" placeholder="z.B. Heizung, Wasser, Müll, Hausmeister"></div>
+        <div class="form-group"><label>Betrag (€) *</label><input id="kp-amount" type="number" min="0" step="0.01" placeholder="1200.00"></div>
+        <div class="form-group"><label>Umlageschlüssel</label>
+          <select id="kp-allocation-key">
+            <option value="sqm">Nach Wohnfläche (m²)</option>
+            <option value="unit">Gleichmäßig pro Wohnung</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px;">
+        <button class="btn btn-primary btn-sm" onclick="saveKostenposition()">Speichern</button>
+        <button class="btn btn-secondary btn-sm" id="kostenposition-cancel-edit-btn" style="display:none" onclick="resetKostenpositionForm()">Bearbeiten abbrechen</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-kostenpositionen')">Schließen</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL: ABRECHNUNGSERGEBNIS JE WOHNUNG ══ -->
+<div class="overlay" id="modal-abrechnung-ergebnis">
+  <div class="modal" style="max-width:820px">
+    <div class="modal-header">
+      <span class="modal-title">Abrechnungsergebnis – <span id="modal-ergebnis-titel"></span></span>
+      <button class="close-btn" onclick="closeModal('modal-abrechnung-ergebnis')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="color:var(--gray);font-size:12.5px;margin-bottom:14px" id="modal-ergebnis-hinweis"></p>
+      <div class="table-wrap">
+        <table class="table-fixed">
+          <thead>
+            <tr>
+              <th style="width:20%">Wohnung</th>
+              <th style="width:18%">Mieter</th>
+              <th style="width:20%">Kosten (Aufteilung)</th>
+              <th style="width:14%">Gesamtkosten</th>
+              <th style="width:14%">Vorauszahlung</th>
+              <th style="width:14%">Ergebnis</th>
+            </tr>
+          </thead>
+          <tbody id="ergebnis-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-abrechnung-ergebnis')">Schließen</button>
     </div>
   </div>
 </div>
