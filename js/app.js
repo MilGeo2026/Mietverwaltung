@@ -14,6 +14,7 @@ let currentZahlungenTenantId = null;
 let editingZahlungId = null;
 let statements = [];
 let costItems = [];
+let currentErgebnisStatementId = null;
 let editingStatementId = null;
 let currentKostenpositionenStatementId = null;
 let editingKostenpositionId = null;
@@ -766,6 +767,7 @@ function computeAllocation(statement) {
 function openErgebnisModal(statementId) {
   const statement = statements.find((s) => s.id === statementId);
   if (!statement) return;
+  currentErgebnisStatementId = statementId;
   document.getElementById('modal-ergebnis-titel').textContent = statement.title;
 
   const property = properties.find((p) => p.id === statement.property_id);
@@ -776,7 +778,7 @@ function openErgebnisModal(statementId) {
   const tbody = document.getElementById('ergebnis-tbody');
   const allocations = computeAllocation(statement);
   if (!allocations.length) {
-    tbody.innerHTML = `<tr><td colspan="6"><div class="empty"><p>Diese Immobilie hat noch keine Wohnungen.</p></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7"><div class="empty"><p>Diese Immobilie hat noch keine Wohnungen.</p></div></td></tr>`;
   } else {
     tbody.innerHTML = allocations.map((a) => {
       const breakdownText = a.breakdown.map((b) => `${esc(b.category)}: ${b.share.toFixed(2)} €`).join('<br>') || '–';
@@ -792,10 +794,87 @@ function openErgebnisModal(statementId) {
         <td data-label="Gesamtkosten">${a.total.toFixed(2)} €</td>
         <td data-label="Vorauszahlung">${a.advance.toFixed(2)} €</td>
         <td data-label="Ergebnis">${balanceLabel}</td>
+        <td data-label="Aktionen">
+          <button class="btn btn-secondary btn-sm" onclick="downloadNebenkostenPdf('${statement.id}','${a.unit.id}')">PDF</button>
+        </td>
       </tr>`;
     }).join('');
   }
   openModal('modal-abrechnung-ergebnis');
+}
+
+// ── PDF-Export je Wohnung/Mieter ──
+function downloadNebenkostenPdf(statementId, unitId) {
+  const statement = statements.find((s) => s.id === statementId);
+  const unit = units.find((u) => u.id === unitId);
+  if (!statement || !unit) return;
+  if (!window.jspdf) { alert('PDF-Bibliothek konnte nicht geladen werden.'); return; }
+
+  const property = properties.find((p) => p.id === statement.property_id);
+  const allocation = computeAllocation(statement).find((a) => a.unit.id === unitId);
+  if (!allocation) return;
+  const months = monthsBetween(statement.period_start, statement.period_end);
+  const tenantNames = allocation.tenants.map((t) => t.name).join(', ') || 'Mieter unbekannt';
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  let y = 20;
+
+  doc.setFontSize(16);
+  doc.text('Nebenkostenabrechnung', 14, y);
+  y += 10;
+
+  doc.setFontSize(10);
+  doc.text(`${property ? property.name : ''}${property?.address ? ' – ' + property.address : ''}`, 14, y);
+  y += 6;
+  doc.text(`Wohnung: ${unit.name}`, 14, y);
+  y += 6;
+  doc.text(`Mieter: ${tenantNames}`, 14, y);
+  y += 6;
+  doc.text(`Abrechnungszeitraum: ${statement.period_start} – ${statement.period_end} (${months} Monat${months === 1 ? '' : 'e'})`, 14, y);
+  y += 12;
+
+  doc.setFontSize(12);
+  doc.text('Kostenaufteilung', 14, y);
+  y += 8;
+
+  doc.setFontSize(10);
+  doc.text('Kategorie', 14, y);
+  doc.text('Anteil', 170, y, { align: 'right' });
+  y += 2;
+  doc.line(14, y, 196, y);
+  y += 6;
+
+  allocation.breakdown.forEach((b) => {
+    doc.text(b.category, 14, y);
+    doc.text(`${b.share.toFixed(2)} €`, 170, y, { align: 'right' });
+    y += 7;
+  });
+
+  y += 2;
+  doc.line(14, y, 196, y);
+  y += 8;
+
+  doc.setFontSize(11);
+  doc.text('Gesamtkosten', 14, y);
+  doc.text(`${allocation.total.toFixed(2)} €`, 170, y, { align: 'right' });
+  y += 7;
+  doc.text('Geleistete Vorauszahlung', 14, y);
+  doc.text(`${allocation.advance.toFixed(2)} €`, 170, y, { align: 'right' });
+  y += 10;
+
+  doc.setFontSize(12);
+  const balanceText = allocation.balance >= 0
+    ? `Guthaben: ${allocation.balance.toFixed(2)} €`
+    : `Nachzahlung: ${Math.abs(allocation.balance).toFixed(2)} €`;
+  doc.text(balanceText, 14, y);
+
+  doc.setFontSize(8);
+  doc.setTextColor(120);
+  doc.text(`Erstellt am ${new Date().toLocaleDateString('de-DE')}`, 14, 285);
+
+  const safeName = (unit.name + '_' + statement.title).replace(/[^a-zA-Z0-9äöüÄÖÜß_-]+/g, '_');
+  doc.save(`Nebenkostenabrechnung_${safeName}.pdf`);
 }
 
 // ══════════════════════════════════════════════════
