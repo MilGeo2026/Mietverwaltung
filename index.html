@@ -49,6 +49,10 @@
         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l9-9 9 9M5 10v10a1 1 0 001 1h12a1 1 0 001-1V10M9 21V12h6v9"/></svg>
         <span>Immobilien</span>
       </div>
+      <div class="nav-item" data-page="mieter" onclick="showPage('mieter')" title="Mieter">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        <span>Mieter</span>
+      </div>
     </nav>
     <div class="sidebar-footer">
       <div id="user-email" style="color:rgba(255,255,255,.6);margin-bottom:8px;word-break:break-all;"></div>
@@ -169,6 +173,34 @@
         </div>
       </div>
 
+      <!-- ══ MIETER ══ -->
+      <div class="page" id="page-mieter">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Mieterliste</span>
+            <div class="search-wrap">
+              <span class="search-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg></span>
+              <input type="text" placeholder="Suchen …" oninput="renderMieterPage(this.value)" style="width:220px">
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="table-fixed">
+              <thead>
+                <tr>
+                  <th style="width:18%">Name</th>
+                  <th style="width:22%">Wohnung</th>
+                  <th style="width:18%">E-Mail</th>
+                  <th style="width:12%">Telefon</th>
+                  <th style="width:10%">Einzug</th>
+                  <th style="width:20%">Aktionen</th>
+                </tr>
+              </thead>
+              <tbody id="mieter-page-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 </div>
@@ -233,44 +265,28 @@
   </div>
 </div>
 
-<!-- ══ MODAL: MIETER EINER WOHNUNG ══ -->
+<!-- ══ MODAL: MIETER ANLEGEN/BEARBEITEN + WOHNUNG ZUWEISEN ══ -->
 <div class="overlay" id="modal-mieter">
-  <div class="modal" style="max-width:760px">
+  <div class="modal">
     <div class="modal-header">
-      <span class="modal-title">Mieter – <span id="modal-mieter-wohnung-name"></span></span>
+      <span class="modal-title" id="modal-mieter-title">Neuer Mieter</span>
       <button class="close-btn" onclick="closeModal('modal-mieter')">✕</button>
     </div>
     <div class="modal-body">
-      <div class="table-wrap">
-        <table class="table-fixed">
-          <thead>
-            <tr>
-              <th style="width:22%">Name</th>
-              <th style="width:22%">E-Mail</th>
-              <th style="width:14%">Telefon</th>
-              <th style="width:12%">Einzug</th>
-              <th style="width:30%">Aktionen</th>
-            </tr>
-          </thead>
-          <tbody id="mieter-tbody"></tbody>
-        </table>
-      </div>
-
-      <div class="section-label" id="mieter-form-label">Mieter hinzufügen</div>
       <div class="form-grid">
+        <div class="form-group full"><label>Wohnung *</label>
+          <select id="m-unit"></select>
+        </div>
         <div class="form-group full"><label>Name *</label><input id="m-name" placeholder="Max Mustermann"></div>
         <div class="form-group"><label>E-Mail</label><input id="m-email" type="email" placeholder="max@example.com"></div>
         <div class="form-group"><label>Telefon</label><input id="m-phone" placeholder="+49 123 456789"></div>
         <div class="form-group"><label>Einzugsdatum</label><input id="m-move-in" type="date"></div>
         <div class="form-group"><label>Auszugsdatum</label><input id="m-move-out" type="date"></div>
       </div>
-      <div style="display:flex;gap:8px;margin-top:12px;">
-        <button class="btn btn-primary btn-sm" onclick="saveMieter()">Speichern</button>
-        <button class="btn btn-secondary btn-sm" id="mieter-cancel-edit-btn" style="display:none" onclick="resetMieterForm()">Bearbeiten abbrechen</button>
-      </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('modal-mieter')">Schließen</button>
+      <button class="btn btn-secondary" onclick="closeModal('modal-mieter')">Abbrechen</button>
+      <button class="btn btn-primary" onclick="saveMieter()">Speichern</button>
     </div>
   </div>
 </div>

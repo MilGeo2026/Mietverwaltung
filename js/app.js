@@ -9,7 +9,6 @@ let currentPage = 'dashboard';
 let editingImmobilieId = null;
 let currentWohnungenPropertyId = null;
 let editingWohnungId = null;
-let currentMieterUnitId = null;
 let editingMieterId = null;
 let currentZahlungenTenantId = null;
 let editingZahlungId = null;
@@ -97,14 +96,16 @@ async function loadData() {
 function refreshAll() {
   renderDashboard();
   renderImmobilien();
+  renderMieterPage();
 }
 
 // ══════════════════════════════════════════════════
 //  NAVIGATION
 // ══════════════════════════════════════════════════
 const pageConfig = {
-  dashboard:  { title: 'Dashboard',  badge: 'Übersicht',      btn: null },
+  dashboard:  { title: 'Dashboard',  badge: 'Übersicht',       btn: null },
   immobilien: { title: 'Immobilien', badge: 'Immobilienliste', btn: 'Neue Immobilie' },
+  mieter:     { title: 'Mieter',     badge: 'Mieterliste',     btn: 'Neuer Mieter' },
 };
 
 function showPage(id) {
@@ -134,6 +135,7 @@ function closeSidebar() {
 
 function openTopbarAction() {
   if (currentPage === 'immobilien') openImmobilieModal();
+  else if (currentPage === 'mieter') openMieterModal();
 }
 
 // ══════════════════════════════════════════════════
@@ -306,7 +308,7 @@ function renderWohnungen() {
       <td data-label="Zimmer">${u.rooms ?? '–'}</td>
       <td data-label="Aktionen">
         <div class="td-actions">
-          <button class="btn btn-secondary btn-sm" onclick="openMieterModal('${u.id}')">Mieter (${count})</button>
+          <button class="btn btn-secondary btn-sm" onclick="goToMieterForWohnung('${u.id}')">Mieter (${count})</button>
           <button class="btn btn-secondary btn-sm" onclick="editWohnung('${u.id}')">Bearbeiten</button>
           <button class="btn btn-danger btn-sm" onclick="deleteWohnung('${u.id}')">Löschen</button>
         </div>
@@ -316,50 +318,58 @@ function renderWohnungen() {
 }
 
 // ══════════════════════════════════════════════════
-//  MIETER (je Wohnung)
+//  MIETER (Wohnung wird per Auswahl zugewiesen)
 // ══════════════════════════════════════════════════
 function tenantsForUnit(unitId) {
   return tenants.filter((t) => t.unit_id === unitId);
 }
 
-function openMieterModal(unitId) {
-  currentMieterUnitId = unitId;
+function unitLabel(unitId) {
   const unit = units.find((u) => u.id === unitId);
-  document.getElementById('modal-mieter-wohnung-name').textContent = unit ? unit.name : '';
-  resetMieterForm();
-  renderMieter();
+  if (!unit) return '–';
+  const property = properties.find((p) => p.id === unit.property_id);
+  return (property ? property.name : '?') + ' – ' + unit.name;
+}
+
+function unitOptionsHtml(selectedUnitId) {
+  if (!units.length) return '<option value="">Keine Wohnungen vorhanden</option>';
+  return units.map((u) => {
+    const selected = u.id === selectedUnitId ? 'selected' : '';
+    return `<option value="${u.id}" ${selected}>${esc(unitLabel(u.id))}</option>`;
+  }).join('');
+}
+
+function goToMieterForWohnung(unitId) {
+  closeModal('modal-wohnungen');
+  showPage('mieter');
+  const unit = units.find((u) => u.id === unitId);
+  const input = document.querySelector('#page-mieter .search-wrap input');
+  const filterValue = unit ? unit.name : '';
+  if (input) input.value = filterValue;
+  renderMieterPage(filterValue);
+}
+
+function openMieterModal(id = null) {
+  editingMieterId = id;
+  const tenant = id ? tenants.find((t) => t.id === id) : null;
+  document.getElementById('m-unit').innerHTML = unitOptionsHtml(tenant ? tenant.unit_id : null);
+  document.getElementById('m-name').value = tenant?.name || '';
+  document.getElementById('m-email').value = tenant?.email || '';
+  document.getElementById('m-phone').value = tenant?.phone || '';
+  document.getElementById('m-move-in').value = tenant?.move_in_date || '';
+  document.getElementById('m-move-out').value = tenant?.move_out_date || '';
+  document.getElementById('modal-mieter-title').textContent = id ? 'Mieter bearbeiten' : 'Neuer Mieter';
   openModal('modal-mieter');
 }
 
-function resetMieterForm() {
-  editingMieterId = null;
-  document.getElementById('m-name').value = '';
-  document.getElementById('m-email').value = '';
-  document.getElementById('m-phone').value = '';
-  document.getElementById('m-move-in').value = '';
-  document.getElementById('m-move-out').value = '';
-  document.getElementById('mieter-form-label').textContent = 'Mieter hinzufügen';
-  document.getElementById('mieter-cancel-edit-btn').style.display = 'none';
-}
-
-function editMieter(id) {
-  const tenant = tenants.find((t) => t.id === id);
-  if (!tenant) return;
-  editingMieterId = id;
-  document.getElementById('m-name').value = tenant.name || '';
-  document.getElementById('m-email').value = tenant.email || '';
-  document.getElementById('m-phone').value = tenant.phone || '';
-  document.getElementById('m-move-in').value = tenant.move_in_date || '';
-  document.getElementById('m-move-out').value = tenant.move_out_date || '';
-  document.getElementById('mieter-form-label').textContent = 'Mieter bearbeiten';
-  document.getElementById('mieter-cancel-edit-btn').style.display = '';
-}
-
 async function saveMieter() {
+  const unitId = document.getElementById('m-unit').value;
   const name = document.getElementById('m-name').value.trim();
+  if (!unitId) { alert('Bitte eine Wohnung auswählen.'); return; }
   if (!name) { alert('Bitte einen Namen angeben.'); return; }
 
   const payload = {
+    unit_id: unitId,
     name,
     email: document.getElementById('m-email').value.trim() || null,
     phone: document.getElementById('m-phone').value.trim() || null,
@@ -371,14 +381,12 @@ async function saveMieter() {
     const { error } = await supabaseClient.from('tenants').update(payload).eq('id', editingMieterId);
     if (error) { alert('Fehler beim Speichern: ' + error.message); return; }
   } else {
-    const { error } = await supabaseClient.from('tenants')
-      .insert({ ...payload, unit_id: currentMieterUnitId });
+    const { error } = await supabaseClient.from('tenants').insert(payload);
     if (error) { alert('Fehler beim Speichern: ' + error.message); return; }
   }
 
+  closeModal('modal-mieter');
   await loadData();
-  resetMieterForm();
-  renderMieter();
 }
 
 async function deleteMieter(id) {
@@ -386,14 +394,18 @@ async function deleteMieter(id) {
   const { error } = await supabaseClient.from('tenants').delete().eq('id', id);
   if (error) { alert('Fehler beim Löschen: ' + error.message); return; }
   await loadData();
-  renderMieter();
 }
 
-function renderMieter() {
-  const tbody = document.getElementById('mieter-tbody');
-  const list = tenantsForUnit(currentMieterUnitId);
+function renderMieterPage(filter = '') {
+  const tbody = document.getElementById('mieter-page-tbody');
+  let list = tenants;
+  if (filter) {
+    const f = filter.toLowerCase();
+    list = list.filter((t) =>
+      (t.name + (t.email || '') + (t.phone || '') + unitLabel(t.unit_id)).toLowerCase().includes(f));
+  }
   if (!list.length) {
-    tbody.innerHTML = `<tr><td colspan="5"><div class="empty"><p>Noch keine Mieter für diese Wohnung.</p></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6"><div class="empty"><p>Keine Mieter gefunden. Lege deinen ersten Mieter an und weise ihm eine Wohnung zu.</p></div></td></tr>`;
     return;
   }
   tbody.innerHTML = list.map((t) => {
@@ -401,13 +413,14 @@ function renderMieter() {
     return `
     <tr>
       <td data-label="Name">${esc(t.name)}</td>
+      <td data-label="Wohnung">${esc(unitLabel(t.unit_id))}</td>
       <td data-label="E-Mail">${esc(t.email || '–')}</td>
       <td data-label="Telefon">${esc(t.phone || '–')}</td>
       <td data-label="Einzug">${esc(t.move_in_date || '–')}</td>
       <td data-label="Aktionen">
         <div class="td-actions">
           <button class="btn btn-secondary btn-sm" onclick="openZahlungenModal('${t.id}')">Zahlungen (${count})</button>
-          <button class="btn btn-secondary btn-sm" onclick="editMieter('${t.id}')">Bearbeiten</button>
+          <button class="btn btn-secondary btn-sm" onclick="openMieterModal('${t.id}')">Bearbeiten</button>
           <button class="btn btn-danger btn-sm" onclick="deleteMieter('${t.id}')">Löschen</button>
         </div>
       </td>
