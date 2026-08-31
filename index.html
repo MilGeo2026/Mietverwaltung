@@ -109,6 +109,24 @@
               <div class="stat-value" id="stat-durchschnitt">0</div>
             </div>
           </div>
+          <div class="stat-card">
+            <div class="stat-icon" style="background:#FCE6F2">
+              <svg fill="none" stroke="#E3007E" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+            </div>
+            <div>
+              <div class="stat-label">Mieter gesamt</div>
+              <div class="stat-value" id="stat-mieter">0</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon" style="background:#FEE2E2">
+              <svg fill="none" stroke="#DC2626" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+            <div>
+              <div class="stat-label">Offene Zahlungen</div>
+              <div class="stat-value" id="stat-offene-zahlungen">0</div>
+            </div>
+          </div>
         </div>
 
         <div class="card">
@@ -188,10 +206,10 @@
         <table class="table-fixed">
           <thead>
             <tr>
-              <th style="width:40%">Name</th>
-              <th style="width:20%">Größe (m²)</th>
-              <th style="width:15%">Zimmer</th>
-              <th style="width:25%">Aktionen</th>
+              <th style="width:30%">Name</th>
+              <th style="width:15%">Größe (m²)</th>
+              <th style="width:12%">Zimmer</th>
+              <th style="width:43%">Aktionen</th>
             </tr>
           </thead>
           <tbody id="wohnungen-tbody"></tbody>
@@ -211,6 +229,95 @@
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-wohnungen')">Schließen</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL: MIETER EINER WOHNUNG ══ -->
+<div class="overlay" id="modal-mieter">
+  <div class="modal" style="max-width:760px">
+    <div class="modal-header">
+      <span class="modal-title">Mieter – <span id="modal-mieter-wohnung-name"></span></span>
+      <button class="close-btn" onclick="closeModal('modal-mieter')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="table-wrap">
+        <table class="table-fixed">
+          <thead>
+            <tr>
+              <th style="width:22%">Name</th>
+              <th style="width:22%">E-Mail</th>
+              <th style="width:14%">Telefon</th>
+              <th style="width:12%">Einzug</th>
+              <th style="width:30%">Aktionen</th>
+            </tr>
+          </thead>
+          <tbody id="mieter-tbody"></tbody>
+        </table>
+      </div>
+
+      <div class="section-label" id="mieter-form-label">Mieter hinzufügen</div>
+      <div class="form-grid">
+        <div class="form-group full"><label>Name *</label><input id="m-name" placeholder="Max Mustermann"></div>
+        <div class="form-group"><label>E-Mail</label><input id="m-email" type="email" placeholder="max@example.com"></div>
+        <div class="form-group"><label>Telefon</label><input id="m-phone" placeholder="+49 123 456789"></div>
+        <div class="form-group"><label>Einzugsdatum</label><input id="m-move-in" type="date"></div>
+        <div class="form-group"><label>Auszugsdatum</label><input id="m-move-out" type="date"></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px;">
+        <button class="btn btn-primary btn-sm" onclick="saveMieter()">Speichern</button>
+        <button class="btn btn-secondary btn-sm" id="mieter-cancel-edit-btn" style="display:none" onclick="resetMieterForm()">Bearbeiten abbrechen</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-mieter')">Schließen</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL: ZAHLUNGEN EINES MIETERS ══ -->
+<div class="overlay" id="modal-zahlungen">
+  <div class="modal" style="max-width:720px">
+    <div class="modal-header">
+      <span class="modal-title">Zahlungen – <span id="modal-zahlungen-mieter-name"></span></span>
+      <button class="close-btn" onclick="closeModal('modal-zahlungen')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="table-wrap">
+        <table class="table-fixed">
+          <thead>
+            <tr>
+              <th style="width:16%">Betrag</th>
+              <th style="width:16%">Fällig</th>
+              <th style="width:16%">Bezahlt</th>
+              <th style="width:14%">Status</th>
+              <th style="width:38%">Aktionen</th>
+            </tr>
+          </thead>
+          <tbody id="zahlungen-tbody"></tbody>
+        </table>
+      </div>
+
+      <div class="section-label" id="zahlung-form-label">Zahlung hinzufügen</div>
+      <div class="form-grid">
+        <div class="form-group"><label>Betrag (€) *</label><input id="z-amount" type="number" min="0" step="0.01" placeholder="850.00"></div>
+        <div class="form-group"><label>Fällig am *</label><input id="z-due-date" type="date"></div>
+        <div class="form-group"><label>Bezahlt am</label><input id="z-paid-date" type="date"></div>
+        <div class="form-group"><label>Status</label>
+          <select id="z-status">
+            <option value="offen">Offen</option>
+            <option value="bezahlt">Bezahlt</option>
+            <option value="ueberfaellig">Überfällig</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px;">
+        <button class="btn btn-primary btn-sm" onclick="saveZahlung()">Speichern</button>
+        <button class="btn btn-secondary btn-sm" id="zahlung-cancel-edit-btn" style="display:none" onclick="resetZahlungForm()">Bearbeiten abbrechen</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-zahlungen')">Schließen</button>
     </div>
   </div>
 </div>
