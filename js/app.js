@@ -621,10 +621,6 @@ async function deleteAbrechnung(id) {
   await loadData();
 }
 
-function tenantsForProperty(propertyId) {
-  return unitsForProperty(propertyId).flatMap((u) => tenantsForUnit(u.id));
-}
-
 function renderNebenkosten() {
   const tbody = document.getElementById('nebenkosten-tbody');
   if (!statements.length) {
@@ -633,10 +629,9 @@ function renderNebenkosten() {
   }
   tbody.innerHTML = statements.map((s) => {
     const property = properties.find((p) => p.id === s.property_id);
-    const propertyTenants = tenantsForProperty(s.property_id);
-    const tenantNames = propertyTenants.map((t) => esc(t.name)).join(', ') || '–';
-    const months = monthsBetween(s.period_start, s.period_end);
-    const totalAdvance = propertyTenants.reduce((sum, t) => sum + (Number(t.advance_payment_monthly) || 0) * months, 0);
+    const tenantRows = computeAllocation(s).filter((a) => a.tenant);
+    const tenantNames = tenantRows.map((a) => esc(a.tenant.name)).join(', ') || '–';
+    const totalAdvance = tenantRows.reduce((sum, a) => sum + a.advance, 0);
     return `
     <tr>
       <td data-label="Titel">${esc(s.title)}</td>
@@ -750,15 +745,32 @@ function monthsBetween(startStr, endStr) {
   return Math.max(months, 1);
 }
 
+function daysInclusive(startStr, endStr) {
+  const start = new Date(startStr + 'T00:00:00');
+  const end = new Date(endStr + 'T00:00:00');
+  return Math.round((end - start) / 86400000) + 1;
+}
+
+// Ermittelt die Überschneidung zwischen der Mietzeit eines Mieters (Einzug/Auszug)
+// und dem Abrechnungszeitraum, damit unterjährige Ein-/Auszüge anteilig berechnet werden.
+function occupancyOverlap(tenant, periodStart, periodEnd) {
+  const occStart = tenant.move_in_date && tenant.move_in_date > periodStart ? tenant.move_in_date : periodStart;
+  const occEnd = tenant.move_out_date && tenant.move_out_date < periodEnd ? tenant.move_out_date : periodEnd;
+  if (occEnd < occStart) return { days: 0, start: occStart, end: occEnd };
+  return { days: daysInclusive(occStart, occEnd), start: occStart, end: occEnd };
+}
+
 function computeAllocation(statement) {
   const items = costItemsForStatement(statement.id);
   const propertyUnits = unitsForProperty(statement.property_id);
   const totalSqm = propertyUnits.reduce((sum, u) => sum + (Number(u.size_qm) || 0), 0);
   const unitCount = propertyUnits.length;
-  const months = monthsBetween(statement.period_start, statement.period_end);
+  const periodMonths = monthsBetween(statement.period_start, statement.period_end);
+  const periodDays = daysInclusive(statement.period_start, statement.period_end);
 
-  return propertyUnits.map((u) => {
-    const breakdown = items.map((item) => {
+  const rows = [];
+  propertyUnits.forEach((u) => {
+    const unitBreakdown = items.map((item) => {
       let share = 0;
       if (item.allocation_key === 'unit') {
         share = unitCount > 0 ? Number(item.amount) / unitCount : 0;
@@ -767,11 +779,24 @@ function computeAllocation(statement) {
       }
       return { category: item.category, share };
     });
-    const total = breakdown.reduce((sum, b) => sum + b.share, 0);
+    const unitTotal = unitBreakdown.reduce((sum, b) => sum + b.share, 0);
     const unitTenants = tenantsForUnit(u.id);
-    const advance = unitTenants.reduce((sum, t) => sum + (Number(t.advance_payment_monthly) || 0) * months, 0);
-    return { unit: u, tenants: unitTenants, breakdown, total, advance, balance: advance - total };
+
+    if (!unitTenants.length) {
+      rows.push({ unit: u, tenant: null, breakdown: unitBreakdown, total: unitTotal, advance: 0, balance: -unitTotal, factor: 0, occStart: null, occEnd: null });
+      return;
+    }
+
+    unitTenants.forEach((t) => {
+      const overlap = occupancyOverlap(t, statement.period_start, statement.period_end);
+      const factor = periodDays > 0 ? overlap.days / periodDays : 0;
+      const breakdown = unitBreakdown.map((b) => ({ category: b.category, share: b.share * factor }));
+      const total = unitTotal * factor;
+      const advance = (Number(t.advance_payment_monthly) || 0) * periodMonths * factor;
+      rows.push({ unit: u, tenant: t, breakdown, total, advance, balance: advance - total, factor, occStart: overlap.start, occEnd: overlap.end });
+    });
   });
+  return rows;
 }
 
 function openErgebnisModal(statementId) {
@@ -792,21 +817,27 @@ function openErgebnisModal(statementId) {
   } else {
     tbody.innerHTML = allocations.map((a) => {
       const breakdownText = a.breakdown.map((b) => `${esc(b.category)}: ${b.share.toFixed(2)} €`).join('<br>') || '–';
-      const tenantNames = a.tenants.map((t) => esc(t.name)).join(', ') || '–';
+      const occupancyNote = a.tenant && a.factor < 1
+        ? `<br><span style="font-size:11px;color:var(--gray)">${esc(a.occStart)} – ${esc(a.occEnd)} (anteilig)</span>`
+        : '';
+      const tenantCell = a.tenant
+        ? `${esc(a.tenant.name)}${occupancyNote}`
+        : '<span style="color:var(--gray)">kein Mieter</span>';
       const balanceLabel = a.balance >= 0
         ? `<span style="color:var(--green)">Guthaben ${a.balance.toFixed(2)} €</span>`
         : `<span style="color:var(--red)">Nachzahlung ${Math.abs(a.balance).toFixed(2)} €</span>`;
+      const actions = a.tenant
+        ? `<button class="btn btn-secondary btn-sm" onclick="downloadNebenkostenPdf('${statement.id}','${a.unit.id}','${a.tenant.id}')">PDF</button>`
+        : '–';
       return `
       <tr>
         <td data-label="Wohnung">${esc(a.unit.name)}</td>
-        <td data-label="Mieter">${tenantNames}</td>
+        <td data-label="Mieter">${tenantCell}</td>
         <td data-label="Kosten (Aufteilung)">${breakdownText}</td>
         <td data-label="Gesamtkosten">${a.total.toFixed(2)} €</td>
         <td data-label="Vorauszahlung">${a.advance.toFixed(2)} €</td>
         <td data-label="Ergebnis">${balanceLabel}</td>
-        <td data-label="Aktionen">
-          <button class="btn btn-secondary btn-sm" onclick="downloadNebenkostenPdf('${statement.id}','${a.unit.id}')">PDF</button>
-        </td>
+        <td data-label="Aktionen">${actions}</td>
       </tr>`;
     }).join('');
   }
@@ -814,17 +845,17 @@ function openErgebnisModal(statementId) {
 }
 
 // ── PDF-Export je Wohnung/Mieter ──
-function downloadNebenkostenPdf(statementId, unitId) {
+function downloadNebenkostenPdf(statementId, unitId, tenantId) {
   const statement = statements.find((s) => s.id === statementId);
   const unit = units.find((u) => u.id === unitId);
   if (!statement || !unit) return;
   if (!window.jspdf) { alert('PDF-Bibliothek konnte nicht geladen werden.'); return; }
 
   const property = properties.find((p) => p.id === statement.property_id);
-  const allocation = computeAllocation(statement).find((a) => a.unit.id === unitId);
+  const allocation = computeAllocation(statement).find((a) => a.unit.id === unitId && a.tenant && a.tenant.id === tenantId);
   if (!allocation) return;
-  const months = monthsBetween(statement.period_start, statement.period_end);
-  const tenantNames = allocation.tenants.map((t) => t.name).join(', ') || 'Mieter unbekannt';
+  const periodMonths = monthsBetween(statement.period_start, statement.period_end);
+  const tenantName = allocation.tenant.name;
 
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
@@ -839,10 +870,15 @@ function downloadNebenkostenPdf(statementId, unitId) {
   y += 6;
   doc.text(`Wohnung: ${unit.name}`, 14, y);
   y += 6;
-  doc.text(`Mieter: ${tenantNames}`, 14, y);
+  doc.text(`Mieter: ${tenantName}`, 14, y);
   y += 6;
-  doc.text(`Abrechnungszeitraum: ${statement.period_start} – ${statement.period_end} (${months} Monat${months === 1 ? '' : 'e'})`, 14, y);
-  y += 12;
+  doc.text(`Abrechnungszeitraum: ${statement.period_start} – ${statement.period_end} (${periodMonths} Monat${periodMonths === 1 ? '' : 'e'})`, 14, y);
+  y += 6;
+  if (allocation.factor < 1) {
+    doc.text(`Mietzeit in diesem Zeitraum: ${allocation.occStart} – ${allocation.occEnd} (anteilig berechnet)`, 14, y);
+    y += 6;
+  }
+  y += 6;
 
   doc.setFontSize(12);
   doc.text('Kostenaufteilung', 14, y);
@@ -883,7 +919,7 @@ function downloadNebenkostenPdf(statementId, unitId) {
   doc.setTextColor(120);
   doc.text(`Erstellt am ${new Date().toLocaleDateString('de-DE')}`, 14, 285);
 
-  const safeName = (unit.name + '_' + statement.title).replace(/[^a-zA-Z0-9äöüÄÖÜß_-]+/g, '_');
+  const safeName = (unit.name + '_' + tenantName + '_' + statement.title).replace(/[^a-zA-Z0-9äöüÄÖÜß_-]+/g, '_');
   doc.save(`Nebenkostenabrechnung_${safeName}.pdf`);
 }
 
