@@ -621,20 +621,30 @@ async function deleteAbrechnung(id) {
   await loadData();
 }
 
+function tenantsForProperty(propertyId) {
+  return unitsForProperty(propertyId).flatMap((u) => tenantsForUnit(u.id));
+}
+
 function renderNebenkosten() {
   const tbody = document.getElementById('nebenkosten-tbody');
   if (!statements.length) {
-    tbody.innerHTML = `<tr><td colspan="5"><div class="empty"><p>Noch keine Abrechnungen angelegt.</p></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7"><div class="empty"><p>Noch keine Abrechnungen angelegt.</p></div></td></tr>`;
     return;
   }
   tbody.innerHTML = statements.map((s) => {
     const property = properties.find((p) => p.id === s.property_id);
+    const propertyTenants = tenantsForProperty(s.property_id);
+    const tenantNames = propertyTenants.map((t) => esc(t.name)).join(', ') || '–';
+    const months = monthsBetween(s.period_start, s.period_end);
+    const totalAdvance = propertyTenants.reduce((sum, t) => sum + (Number(t.advance_payment_monthly) || 0) * months, 0);
     return `
     <tr>
       <td data-label="Titel">${esc(s.title)}</td>
       <td data-label="Immobilie">${esc(property ? property.name : '–')}</td>
       <td data-label="Zeitraum">${esc(s.period_start)} – ${esc(s.period_end)}</td>
+      <td data-label="Mieter">${tenantNames}</td>
       <td data-label="Gesamtkosten">${statementTotal(s.id).toFixed(2)} €</td>
+      <td data-label="Vorauszahlungen">${totalAdvance.toFixed(2)} €</td>
       <td data-label="Aktionen">
         <div class="td-actions">
           <button class="btn btn-secondary btn-sm" onclick="openKostenpositionenModal('${s.id}')">Kostenpositionen (${costItemsForStatement(s.id).length})</button>
